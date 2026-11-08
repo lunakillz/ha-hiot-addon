@@ -5,8 +5,8 @@ ENV LANG=C.UTF-8
 
 WORKDIR /app
 
-# Install Node.js & npm
-RUN apk add --no-cache nodejs npm
+# Install Node.js & npm & curl
+RUN apk add --no-cache nodejs npm curl ca-certificates
 
 # Install dependencies
 COPY package*.json ./

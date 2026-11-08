@@ -1,8 +1,10 @@
 name: "Hi-oT Smart Home Bridge"
 slug: "hiot_bridge"
 description: "현대 힐스테이트 Hi-oT 스마트홈 조명, 난방, 에어컨, 환기, 콘센트, 엘리베이터를 Home Assistant로 자동 등록 및 제어하는 MQTT 브릿지"
-version: "1.0.1"
+version: "1.0.2"
 url: "https://github.com/lunakillz/ha-hiot-addon"
+map:
+  - homeassistant_config:rw
 arch:
   - aarch64
   - amd64
