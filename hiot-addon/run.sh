@@ -35,6 +35,28 @@ if [ -n "$HA_DIR" ]; then
   else
     echo "[Hi-oT Add-on] HaCasa Nova card already present at $HA_DIR/www/community/HaCasa/hacasa-nova.js"
   fi
+
+  # Ensure Korean/non-Latin room slug navigation support in HaCasa Nova
+  if [ -f "$HA_DIR/www/community/HaCasa/hacasa-nova.js" ]; then
+    node -e '
+      const fs = require("fs");
+      const file = process.argv[1];
+      let code = fs.readFileSync(file, "utf8");
+      let changed = false;
+      if (code.includes("let u=gt(s.name)") && !code.includes("let u=gt(s.name)||s.area_id")) {
+        code = code.replace("let u=gt(s.name)", "let u=gt(s.name)||s.area_id");
+        changed = true;
+      }
+      if (code.includes("slug:gt(b.name)") && !code.includes("slug:gt(b.name)||b.area_id")) {
+        code = code.replace("slug:gt(b.name)", "slug:gt(b.name)||b.area_id");
+        changed = true;
+      }
+      if (changed) {
+        fs.writeFileSync(file, code, "utf8");
+        console.log("[Hi-oT Add-on] Successfully patched HaCasa Nova Korean room slug navigation.");
+      }
+    ' "$HA_DIR/www/community/HaCasa/hacasa-nova.js"
+  fi
 fi
 
 exec node src/hiot-ha-bridge.js
