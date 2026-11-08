@@ -309,16 +309,59 @@ export class HiotHaBridge {
     }
   }
 
+  getIntuitiveNames(d) {
+    let space = d.spacenm || '';
+    let rawName = d.devicenm || '';
+
+    if (space === '침실1') space = '안방';
+    if (space === '침실2') space = '서재';
+
+    let deviceName = '';
+    const type = d.devicetypecd;
+
+    if (
+      rawName.includes('주방1-3') ||
+      rawName.includes('주방1-4') ||
+      d.devicecd?.includes('e7d4L7J52v') ||
+      d.devicecd?.includes('Y3V4c9J52x')
+    ) {
+      space = '화장실';
+      deviceName = rawName.includes('3') ? '화장실 조명 1' : '화장실 조명 2';
+    } else if (LIGHT_DEVICE_TYPES.includes(type)) {
+      const match = rawName.match(/\d+$/);
+      const num = match ? match[0] : '1';
+      deviceName = `${space} 조명 ${num}`;
+    } else if (type === 'WSK') {
+      const match = rawName.match(/\d+$/);
+      const num = match ? match[0] : '1';
+      deviceName = `${space} 콘센트 ${num}`;
+    } else if (type === 'HTR') {
+      deviceName = `${space} 난방`;
+    } else if (type === 'ACB') {
+      deviceName = `${space} 에어컨`;
+    } else if (type === 'VNT') {
+      deviceName = `${space} 환기`;
+    } else if (type === 'SWT') {
+      const isSecond = d.devicecd?.endsWith('2') || rawName.includes('2');
+      deviceName = `현관 일괄스위치 ${isSecond ? '2' : '1'}`;
+    } else {
+      deviceName = `${space} ${rawName}`.trim();
+    }
+
+    return { space, deviceName };
+  }
+
   getDeviceInfo(d) {
     const household = this.client.state.loginInfo?.householdcd || 'home';
     const complex = this.client.state.loginInfo?.complexnm || 'Hillstate';
     const typeName = DEVICE_TYPE_NAMES[d.devicetypecd] || d.devicetypecd;
+    const { space, deviceName } = this.getIntuitiveNames(d);
     return {
       identifiers: [`hiot_${household}_${d.devicecd}`],
-      name: `${d.spacenm ? `[${d.spacenm}] ` : ''}${d.devicenm}`,
+      name: deviceName,
       model: `Hi-oT ${typeName}`,
       manufacturer: 'Hyundai AutoEver',
-      suggested_area: d.spacenm || undefined,
+      suggested_area: space,
     };
   }
 
@@ -330,7 +373,8 @@ export class HiotHaBridge {
     if (LIGHT_DEVICE_TYPES.includes(type)) {
       const configTopic = `${discoveryPrefix}/light/hiot_${d.devicecd}/config`;
       const payload = {
-        name: d.devicenm,
+        name: null,
+        has_entity_name: true,
         unique_id: `hiot_${d.devicecd}`,
         state_topic: `${topicPrefix}/light/${d.devicecd}/state`,
         command_topic: `${topicPrefix}/light/${d.devicecd}/set`,
@@ -349,7 +393,8 @@ export class HiotHaBridge {
     if (type === 'WSK') {
       const configTopic = `${discoveryPrefix}/switch/hiot_${d.devicecd}/config`;
       const payload = {
-        name: `${d.devicenm} 콘센트`,
+        name: null,
+        has_entity_name: true,
         unique_id: `hiot_${d.devicecd}`,
         state_topic: `${topicPrefix}/switch/${d.devicecd}/state`,
         command_topic: `${topicPrefix}/switch/${d.devicecd}/set`,
@@ -367,7 +412,8 @@ export class HiotHaBridge {
     if (type === 'HTR') {
       const configTopic = `${discoveryPrefix}/climate/hiot_${d.devicecd}/config`;
       const payload = {
-        name: `${d.spacenm || ''} 난방`,
+        name: null,
+        has_entity_name: true,
         unique_id: `hiot_${d.devicecd}`,
         mode_state_topic: `${topicPrefix}/climate/${d.devicecd}/mode_state`,
         mode_command_topic: `${topicPrefix}/climate/${d.devicecd}/mode_set`,
@@ -390,7 +436,8 @@ export class HiotHaBridge {
     if (type === 'ACB') {
       const configTopic = `${discoveryPrefix}/climate/hiot_${d.devicecd}/config`;
       const payload = {
-        name: `${d.spacenm || ''} 에어컨`,
+        name: null,
+        has_entity_name: true,
         unique_id: `hiot_${d.devicecd}`,
         mode_state_topic: `${topicPrefix}/climate/${d.devicecd}/mode_state`,
         mode_command_topic: `${topicPrefix}/climate/${d.devicecd}/mode_set`,
@@ -413,7 +460,8 @@ export class HiotHaBridge {
     if (type === 'VNT') {
       const configTopic = `${discoveryPrefix}/fan/hiot_${d.devicecd}/config`;
       const payload = {
-        name: `${d.spacenm || ''} 환기`,
+        name: null,
+        has_entity_name: true,
         unique_id: `hiot_${d.devicecd}`,
         state_topic: `${topicPrefix}/fan/${d.devicecd}/state`,
         command_topic: `${topicPrefix}/fan/${d.devicecd}/set`,
@@ -430,7 +478,8 @@ export class HiotHaBridge {
     if (type === 'SWT') {
       const configTopic = `${discoveryPrefix}/switch/hiot_${d.devicecd}/config`;
       const payload = {
-        name: `${d.spacenm || ''} ${d.devicenm} 일괄스위치`,
+        name: null,
+        has_entity_name: true,
         unique_id: `hiot_${d.devicecd}`,
         state_topic: `${topicPrefix}/switch/${d.devicecd}/state`,
         command_topic: `${topicPrefix}/switch/${d.devicecd}/set`,
