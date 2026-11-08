@@ -1,0 +1,22 @@
+{
+  "name": "hiot-smart-home-client",
+  "version": "1.0.0",
+  "description": "Hyundai AutoEver Hillstate Hi-oT Smart Home Node.js API client and CLI (interoperability client based on APK v1.0.101 protocol)",
+  "type": "module",
+  "main": "./src/hiot-client.js",
+  "bin": {
+    "hiot": "./hiot-cli.js"
+  },
+  "scripts": {
+    "start": "node hiot-cli.js",
+    "test": "node --test test/*.test.js",
+    "bridge": "node src/hiot-ha-bridge.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "mqtt": "^5.16.1"
+  }
+}

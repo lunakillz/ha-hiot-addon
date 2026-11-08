@@ -9,12 +9,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
 
-# Copy project files
+# Copy application source
 COPY src/ ./src/
-COPY hiot-cli.js ./
-
-# Copy runner
-COPY hiot-addon/run.sh ./run.sh
+COPY run.sh ./run.sh
 RUN chmod +x ./run.sh
 
 EXPOSE 8099
