@@ -80,21 +80,43 @@ export class HiotHaBridge {
     this.isRunning = true;
     this.log('info', 'Starting Hi-oT Home Assistant Bridge...');
 
-    // 1. Authenticate with Hi-oT
-    await this.initHiot();
-
-    // 2. Connect to MQTT Broker
-    await this.initMqtt();
-
-    // 3. Start Web UI / Ingress HTTP Server
+    // 1. Start Web UI / Ingress HTTP Server FIRST so Ingress and diagnostics work
     await this.initHttp();
 
-    // 4. Initial device scan & publish discovery
-    await this.refreshDevices(true);
+    // 2. Connect to MQTT Broker
+    try {
+      await this.initMqtt();
+    } catch (err) {
+      this.log('error', `MQTT connection error: ${err.message}`);
+    }
 
-    // 5. Start Polling Loop
+    // 3. Authenticate with Hi-oT (non-fatal so container doesn't crash-loop)
+    try {
+      await this.initHiot();
+      await this.refreshDevices(true);
+    } catch (err) {
+      this.authError = err.message;
+      this.log('error', `Hi-oT authentication error: ${err.message}`);
+      if (err.message.includes('잠겼습니다') || err.message.includes('초과')) {
+        this.log('warn', '계정이 일시 잠금되었습니다. 잠금 해제 시간까지 대기합니다. (애드온은 종료되지 않고 실행을 유지합니다)');
+      } else {
+        this.log('warn', 'Hi-oT 계정 설정(아이디/비밀번호)을 확인하세요.');
+      }
+    }
+
+    // 4. Start Polling Loop (periodically retrying auth if needed)
     const intervalMs = Math.max(10, this.options.pollingIntervalSec) * 1000;
-    this.pollingTimer = setInterval(() => {
+    this.pollingTimer = setInterval(async () => {
+      if (!this.client.state.userKeyValu) {
+        try {
+          await this.initHiot();
+          this.authError = null;
+          await this.refreshDevices(true);
+        } catch (e) {
+          this.authError = e.message;
+        }
+        return;
+      }
       this.refreshDevices(false).catch((err) => {
         this.log('error', `Periodic device refresh failed: ${err.message}`);
       });
@@ -895,8 +917,7 @@ if (isDirectRun) {
   const bridge = new HiotHaBridge(haOpts);
 
   bridge.start().catch((err) => {
-    console.error('[Hi-oT HA Bridge Fatal Error]', err.message);
-    process.exit(1);
+    console.error('[Hi-oT HA Bridge Error]', err.message);
   });
 
   const handleExit = () => {
