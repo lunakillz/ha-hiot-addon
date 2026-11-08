@@ -20,7 +20,7 @@ test('HiotHaBridge correctly formats HA MQTT Discovery configs', async () => {
 
   const info = bridge.getDeviceInfo(sampleLight);
   assert.equal(info.suggested_area, '거실');
-  assert.equal(info.name, '[거실] 거실1');
+  assert.equal(info.name, '거실 조명 1');
 
   // Verify MQTT message simulation
   const commandsSent = [];
@@ -56,10 +56,25 @@ test('HiotHaBridge correctly formats HA MQTT Discovery configs', async () => {
   };
   bridge.devices.set('HTR_TEST_01', sampleHtr);
 
+  // 1. Setting mode to heat
+  await bridge.handleMqttMessage('hiot/climate/HTR_TEST_01/mode_set', 'heat');
+  const heatCmd = commandsSent.find((c) => c.devicecd === 'HTR_TEST_01' && c.value === 'on');
+  assert.ok(heatCmd);
+  const modePub = publishedMessages.find((m) => m.topic === 'hiot/climate/HTR_TEST_01/mode_state');
+  assert.equal(modePub.payload, 'heat');
+
+  // 2. Setting temperature
   await bridge.handleMqttMessage('hiot/climate/HTR_TEST_01/temp_set', '25');
   const tempCmd = commandsSent.find((c) => c.resource === 'temperature');
   assert.equal(tempCmd.devicecd, 'HTR_TEST_01');
   assert.equal(tempCmd.value, 25);
+  const tempPub = publishedMessages.find((m) => m.topic === 'hiot/climate/HTR_TEST_01/temp_state');
+  assert.equal(tempPub.payload, '25');
+
+  // 3. Setting mode to off
+  await bridge.handleMqttMessage('hiot/climate/HTR_TEST_01/mode_set', 'off');
+  const offCmd = commandsSent.find((c) => c.devicecd === 'HTR_TEST_01' && c.value === 'off');
+  assert.ok(offCmd);
 });
 
 test('HiotHaBridge Web API provides status and handles control requests', async () => {

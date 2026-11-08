@@ -193,13 +193,18 @@ export class HiotHaBridge {
         client.publish(`${topicPrefix}/status`, 'online', { retain: true, qos: 1 });
 
         // Subscribe to all command topics
-        const commandSub = `${topicPrefix}/+/+/set`;
-        const subCommandSub = `${topicPrefix}/+/+/+/set`;
-        const buttonSub = `${topicPrefix}/button/+/press`;
+        const commandSubs = [
+          `${topicPrefix}/+/+/set`,
+          `${topicPrefix}/+/+/mode_set`,
+          `${topicPrefix}/+/+/temp_set`,
+          `${topicPrefix}/+/+/+/set`,
+          `${topicPrefix}/button/+/press`,
+          `${topicPrefix}/button/+/+/press`,
+        ];
 
-        client.subscribe([commandSub, subCommandSub, buttonSub], (err) => {
+        client.subscribe(commandSubs, (err) => {
           if (err) this.log('error', `Failed to subscribe to MQTT commands: ${err.message}`);
-          else this.log('info', `Subscribed to command topics: ${commandSub}, ${subCommandSub}, ${buttonSub}`);
+          else this.log('info', `Subscribed to command topics: ${commandSubs.join(', ')}`);
         });
 
         if (!initialResolved) {
@@ -647,10 +652,14 @@ export class HiotHaBridge {
       if (action === 'mode_set') {
         const mode = payload.toLowerCase();
         const turnOn = mode !== 'off';
-        await this.client.executeDeviceBatch([
-          { devicecd, resource: 'operation', attribute: 'power', value: turnOn ? 'on' : 'off' },
-        ]);
         const detail = this.climateDetails.get(devicecd) || {};
+        const cmds = [
+          { devicecd, resource: 'operation', attribute: 'power', value: turnOn ? 'on' : 'off' },
+        ];
+        if (turnOn && detail.desiredTemp) {
+          cmds.push({ devicecd, resource: 'temperature', attribute: 'desired', value: detail.desiredTemp });
+        }
+        await this.client.executeDeviceBatch(cmds);
         detail.power = turnOn ? 'on' : 'off';
         this.climateDetails.set(devicecd, detail);
         if (device) device.attributevalu = turnOn ? 'on' : 'off';
@@ -671,7 +680,9 @@ export class HiotHaBridge {
           detail.desiredTemp = temp;
           this.climateDetails.set(devicecd, detail);
           if (device) device.attributevalu = 'on';
+          const activeMode = device?.devicetypecd === 'ACB' ? 'cool' : 'heat';
           await this.publish(`${topicPrefix}/climate/${devicecd}/temp_state`, String(temp), { retain: true });
+          await this.publish(`${topicPrefix}/climate/${devicecd}/mode_state`, activeMode, { retain: true });
           this.log('info', `Climate ${devicecd} target temperature set to ${temp}°C`);
         }
         return;
