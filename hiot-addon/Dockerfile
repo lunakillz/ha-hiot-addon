@@ -5,6 +5,9 @@ ENV LANG=C.UTF-8
 
 WORKDIR /app
 
+# Install Node.js & npm
+RUN apk add --no-cache nodejs npm
+
 # Install dependencies
 COPY package*.json ./
 RUN npm install --omit=dev
