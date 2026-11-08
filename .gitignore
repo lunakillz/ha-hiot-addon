@@ -1,0 +1,21 @@
+# Session tokens & credentials (CRITICAL: NEVER COMMIT)
+.hiot-session.json
+.hiot-session*.json
+.cli-session*.json
+.env
+.env.*
+
+# Binaries & large vendor packages
+*.apk
+node_modules/
+
+# Logs & temp
+*.log
+npm-debug.log*
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
