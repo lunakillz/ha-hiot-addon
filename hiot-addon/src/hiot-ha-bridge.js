@@ -146,13 +146,33 @@ export class HiotHaBridge {
   }
 
   async initHiot() {
-    const hasSession = await this.client.loadSession();
-    if (hasSession && this.client.state.userId) {
-      this.log('info', `Loaded existing Hi-oT session for user: ${this.client.state.userId}`);
-      return;
+    const { hiotUserId, hiotPassword, hiotPin } = this.options;
+    if (hiotUserId && hiotPassword) {
+      this.client.credentials = {
+        userId: hiotUserId,
+        password: hiotPassword,
+        pin: hiotPin,
+      };
     }
 
-    const { hiotUserId, hiotPassword, hiotPin } = this.options;
+    const hasSession = await this.client.loadSession();
+    if (hasSession && this.client.state.userId) {
+      if (!hiotUserId || this.client.state.userId.toLowerCase() === hiotUserId.toLowerCase()) {
+        this.log('info', `Loaded existing Hi-oT session for user: ${this.client.state.userId}`);
+        try {
+          await this.client.getDevices();
+          this.log('info', 'Existing session validated successfully.');
+          return;
+        } catch (err) {
+          this.log('warn', `Existing session is invalid or expired (${err.message}). Performing fresh login...`);
+          await this.client.clearSession();
+        }
+      } else {
+        this.log('info', `Session user (${this.client.state.userId}) differs from configured user (${hiotUserId}). Performing fresh login...`);
+        await this.client.clearSession();
+      }
+    }
+
     if (!hiotUserId || !hiotPassword) {
       throw new Error(
         'Hi-oT credentials missing. Please set hiot_user_id and hiot_password in add-on options or environment variables.'

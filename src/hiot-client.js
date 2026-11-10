@@ -208,6 +208,7 @@ export class HiotClient {
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
     this.reloginRetryDelayMs = options.reloginRetryDelayMs ?? 2000;
     this.maxReloginAttempts = options.maxReloginAttempts ?? 3;
+    this.credentials = options.credentials ?? null;
 
     this.state = {
       clientId: options.clientId ?? crypto.randomUUID(),
@@ -381,11 +382,15 @@ export class HiotClient {
     // Check BaseResponseDTO & nested DTO errorcode (`RetrofitCallBack` + `SignInFragment$9` logic)
     const apiErr = extractHiotError(data);
     if (apiErr) {
+      const errCode = (apiErr.code || '').toLowerCase();
+      const isAuthError =
+        errCode === SESSION_EXPIRED_CODE ||
+        errCode.startsWith('smarthome.error.auth');
+
       if (
-        apiErr.code.toLowerCase() === SESSION_EXPIRED_CODE &&
+        isAuthError &&
         allowAutoRelogin &&
-        this.state.userId &&
-        this.state.userKeyValu
+        ((this.state.userId && this.state.userKeyValu) || this.credentials?.password)
       ) {
         await this.autoReloginWithRetry();
         return this.rawRequest(method, urlOrPath, { ...options, allowAutoRelogin: false });
@@ -415,20 +420,35 @@ export class HiotClient {
 
   /**
    * Retry `relogin()` up to `maxReloginAttempts` times (`HApplication.d()` + `RetrofitCallBack` behavior).
+   * If token-based relogin fails (e.g. session invalidated by mobile app login) and credentials are known,
+   * falls back to full ID/password login automatically.
    */
   async autoReloginWithRetry() {
     let lastError;
-    for (let attempt = 1; attempt <= this.maxReloginAttempts; attempt++) {
-      try {
-        return await this.relogin();
-      } catch (err) {
-        lastError = err;
-        if (attempt < this.maxReloginAttempts && this.reloginRetryDelayMs > 0) {
-          await sleep(this.reloginRetryDelayMs);
+    if (this.state.userId && this.state.userKeyValu) {
+      for (let attempt = 1; attempt <= this.maxReloginAttempts; attempt++) {
+        try {
+          return await this.relogin();
+        } catch (err) {
+          lastError = err;
+          const errCode = (err?.code || '').toLowerCase();
+          // Token invalid / bad credentials on relogin: don't loop endlessly, break to full login fallback
+          if (errCode.startsWith('smarthome.error.auth') || err?.message?.includes('패스워드')) {
+            break;
+          }
+          if (attempt < this.maxReloginAttempts && this.reloginRetryDelayMs > 0) {
+            await sleep(this.reloginRetryDelayMs);
+          }
         }
       }
     }
-    throw lastError;
+
+    // Fall back to full credentials login if available
+    if (this.credentials?.userId && this.credentials?.password) {
+      return await this.login(this.credentials);
+    }
+
+    throw lastError || new HiotApiError('인증이 만료되었으나 재로그인할 인증 정보가 없습니다.');
   }
 
   /**
@@ -448,6 +468,8 @@ export class HiotClient {
     if (!userId || !password) {
       throw new TypeError('Both userId and password are required for login()');
     }
+
+    this.credentials = { userId, password, pin, pushToken };
 
     const body = {
       condition: {

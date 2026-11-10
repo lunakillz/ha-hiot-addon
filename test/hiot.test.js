@@ -370,3 +370,36 @@ test('HiotClient login, cookie persistence, auto-relogin on smarthome.error.auth
   assert.match(cliOutput, /거실1/);
   assert.match(cliOutput, /\[스마트모드 실행 결과\]/);
 });
+
+test('HiotClient auto-recovers via full login when relogin token is rejected (e.g. mobile app login)', async () => {
+  const client = new HiotClient({
+    credentials: { userId: 'tester', password: 'secret-password' },
+  });
+
+  client.state.userId = 'tester';
+  client.state.userKeyValu = 'INVALID_TOKEN';
+
+  let reloginCalled = false;
+  let fullLoginCalled = false;
+
+  client.relogin = async () => {
+    reloginCalled = true;
+    const err = new Error('ID 또는 패스워드를 확인하세요.');
+    err.code = 'smarthome.error.auth.00004';
+    throw err;
+  };
+
+  client.login = async (creds) => {
+    fullLoginCalled = true;
+    assert.equal(creds.userId, 'tester');
+    assert.equal(creds.password, 'secret-password');
+    client.state.userKeyValu = 'NEW_VALID_TOKEN';
+    return { login: [{ userkeyvalu: 'NEW_VALID_TOKEN' }] };
+  };
+
+  const res = await client.autoReloginWithRetry();
+  assert.equal(reloginCalled, true);
+  assert.equal(fullLoginCalled, true);
+  assert.equal(client.state.userKeyValu, 'NEW_VALID_TOKEN');
+});
+
